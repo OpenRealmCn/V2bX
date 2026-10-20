@@ -330,6 +330,11 @@ require (
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
 
-replace github.com/sagernet/sing-box v1.13.0 => github.com/wyx2685/sing-box_mod v1.13.0-alpha.5.0.20251202212447-8d054dcd8bfe
+replace github.com/sagernet/sing-box v1.13.0 => github.com/OpenRealmCn/sing-box_mod v1.13.0-alpha.5.0.20251202212447-8d054dcd8bfe
 
-replace github.com/xtls/xray-core v1.251202.0 => github.com/wyx2685/xray-core v0.0.0-20251202200223-63db1dc9e9e2
+replace github.com/xtls/xray-core v1.251202.0 => github.com/OpenRealmCn/Xray-core v0.0.0-20251202200223-63db1dc9e9e2
+
+// sing-vmess 的 go.mod 内部声明 module path 为 github.com/wyx2685/sing-vmess（与 owner 名绑定），
+// 因此 require 行必须保留 wyx2685 这个名字，改用 replace 把实际下载源重定向到 OpenRealmCn 的 fork。
+// 直接把 require 改成 OpenRealmCn 会报错 "module declares its path as ... but was required as ..."。
+replace github.com/wyx2685/sing-vmess => github.com/OpenRealmCn/sing-vmess v0.0.0-20250723121437-95d5ab59ff92
