@@ -1,7 +1,17 @@
 name: Build and Release
 
+# 说明：本仓库是 fork，GitHub 不会为 fork 自动派发 push / release 事件，
+# 因此上游靠「发布 Release 触发构建」的流程在这里不生效。
+# 改用 workflow_dispatch 的 release_tag 输入手动发布：
+#   gh workflow run release.yml --repo OpenRealmCn/V2bX --ref dev_new -f release_tag=v0.4.0-or1
+# 留空 release_tag 则只构建 Artifacts、不上传 Release（与上游行为一致）。
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '要上传到的 Release tag（留空则仅构建 Artifacts）'
+        required: false
+        type: string
   push:
     branches:
       - master
@@ -114,14 +124,28 @@ jobs:
       - name: Get project dependencies
         run: |
           go mod download
-      - name: Get release version
-        if: ${{ github.event_name == 'release' }}
+      - name: Resolve version
+        env:
+          # 经 env 传递而非直接插值进 shell，避免 tag 名注入命令
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          EVENT_SHA: ${{ github.sha }}
         run: |
-          echo "version=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
-      - name: Get other version
-        if: ${{ github.event_name != 'release' }}
-        run: |
-          echo "version=${{ github.sha }}" >> $GITHUB_ENV
+          if [ "$EVENT_NAME" = "release" ]; then
+            version=$(echo "$GITHUB_REF" | cut -d / -f 3)
+            release_tag="$version"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_TAG" ]; then
+            # 手动发布：用传入的 tag 名，保证 `V2bX version` 输出可读版本号而非 commit SHA
+            version="$INPUT_TAG"
+            release_tag="$INPUT_TAG"
+          else
+            version="$EVENT_SHA"
+            release_tag=""
+          fi
+          echo "resolved version: $version"
+          echo "release_tag: ${release_tag:-<empty, artifacts only>}"
+          echo "version=$version" >> $GITHUB_ENV
+          echo "release_tag=$release_tag" >> $GITHUB_ENV
       - name: Build V2bX
         run: |
           echo "version: $version"
@@ -175,9 +199,10 @@ jobs:
             ./V2bX-${{ steps.get_filename.outputs.ASSET_NAME }}/*
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'release'
+        if: env.release_tag != ''
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ./V2bX-${{ steps.get_filename.outputs.ASSET_NAME }}.zip*
-          tag: ${{ github.ref }}
+          tag: ${{ env.release_tag }}
           file_glob: true
+          overwrite: true
